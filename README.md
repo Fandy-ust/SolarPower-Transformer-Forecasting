@@ -2,7 +2,7 @@
 
 This repository contains the code and documentation for a state-of-the-art deep learning model that predicts high-resolution solar power generation. Using a Transformer architecture, this project tackles the real-world challenge of forecasting a 5-hour energy output (in 15-minute intervals) based on historical generation data and weather forecasts.
 
-The model achieves an exceptional **R-squared (R²) score of 0.9002** on the final test set, demonstrating its high accuracy and reliability.
+The model achieves an exceptional **R-squared (R²) score of 0.9008** on the final test set, demonstrating its high accuracy and reliability.
 
 This project is not just a demonstration of a powerful architecture, but a case study in advanced model development, including multi-phase training, mitigating exposure bias, and aggressive, intuition-driven fine-tuning.
 
@@ -12,7 +12,7 @@ This project is not just a demonstration of a powerful architecture, but a case 
 * **Transformer Architecture:** Leverages the power of self-attention mechanisms to capture complex temporal dependencies.
 * **Advanced Training Strategy:** Employs a three-phase training methodology to build a robust, production-ready model.
 * **Exposure Bias Mitigation:** The final training phase is fully autoregressive, forcing the model to learn from its own predictions and making it resilient to compounding errors.
-* **State-of-the-Art Performance:** Achieves a final R² of **0.9002** and an RMSE of **1.624 kW**.
+* **State-of-the-Art Performance:** Achieves a final R² of **0.9008** and an RMSE of **1.6210 kW**.
 
 ## Performance
 
@@ -22,7 +22,7 @@ The project's success is best illustrated by the iterative improvement across th
 | :------------ | :----------------------------------- | :---------- | :----------------- |
 | **V4**        | Elite Baseline (Pre-Polish)          | 0.8731      | \~1.95             |
 | **V5**        | Standard Autoregressive Polish       | 0.8779      | 1.798              |
-| **V6**        | **Aggressive Autoregressive Polish** | **0.9002**  | **1.624**          |
+| **V6**        | **Aggressive Autoregressive Polish** | **0.9008**  | **1.621**          |
 
 
 
@@ -63,7 +63,7 @@ These features enhanced the model's ability to predict accurately over 6-hour ho
 
 ### Building the Model: From Baseline to State-of-the-Art
 
-In this project, I developed a Transformer-based model for solar power forecasting. Below, I'll walk you through the key phases of development, highlighting the challenges, innovations, and improvements along the way. Each phase built on the last, tackling issues like exposure bias and over-regularization to achieve a final R² score of **0.9002**.
+In this project, I developed a Transformer-based model for solar power forecasting. Below, I'll walk you through the key phases of development, highlighting the challenges, innovations, and improvements along the way. Each phase built on the last, tackling issues like exposure bias and over-regularization to achieve a final R² score of **0.9008**.
 
 #### Phase 1 & 2: Establishing a Strong Baseline (Model V4)
 
@@ -90,7 +90,7 @@ Analyzing Model V5 revealed it was slightly over-regularized—training and vali
 > "We can tolerate a growing gap between training and validation loss if validation performance keeps improving—the model has more to learn."
 
 - **Adjustments**: Set `dropout = 0` (no regularization) and reduced `batch_size` for more precise updates.
-- **Outcome**: This unlocked the model's full power, boosting the R² to a state-of-the-art **0.9002**.
+- **Outcome**: This unlocked the model's full power, boosting the R² to a state-of-the-art **0.9008**.
 
 These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For more details, check the code in `src/` or run the notebooks!
 
