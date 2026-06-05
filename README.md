@@ -10,7 +10,7 @@ This project is not just a demonstration of a powerful architecture, but a case 
 
 * **High-Resolution Forecasting:** Predicts solar generation for a 5-hour horizon at a 15-minute granularity.
 * **Transformer Architecture:** Leverages the power of self-attention mechanisms to capture complex temporal dependencies.
-* **Advanced Training Strategy:** Employs a three-phase training methodology to build a robust, production-ready model.
+* **Advanced Training Strategy:** Employs teacher forcing, staged semi-autoreg refinement, scheduled sampling, and finally a fully autoregressive polish.
 * **Exposure Bias Mitigation:** The final training phase is fully autoregressive, forcing the model to learn from its own predictions and making it resilient to compounding errors.
 * **State-of-the-Art Performance:** Achieves a final R² of **0.9008** and an RMSE of **1.6210 kW**.
 
@@ -24,6 +24,21 @@ The project's success is best illustrated by the iterative improvement across th
 | **V5**        | Standard Autoregressive Polish       | 0.8779      | 1.798              |
 | **V6**        | **Aggressive Autoregressive Polish** | **0.9008**  | **1.621**          |
 
+## Results Gallery
+
+The plots below show how the final model behaves across the 20-step forecast horizon. The horizon covers 5 hours at 15-minute resolution, so later steps are harder because the model must keep using its own previous predictions.
+
+| R² across forecast horizon | RMSE across forecast horizon |
+| :---: | :---: |
+| ![R² vs forecast steps](docs/figures/r2_vs_steps.png) | ![RMSE vs forecast steps](docs/figures/rmse_vs_steps.png) |
+
+The sample traces compare predicted solar generation against the observed curve. These examples are useful because solar forecasting is not only about hitting aggregate metrics: the model also needs to capture the daily generation shape, ramp-up, peak, and ramp-down behavior.
+
+| Sample prediction | Sample prediction |
+| :---: | :---: |
+| ![Sample forecast 2-1](docs/figures/samples/sample_2_1.png) | ![Sample forecast 4-2](docs/figures/samples/sample_4_2.png) |
+| ![Sample forecast 6-1](docs/figures/samples/sample_6_1.png) | ![Sample forecast 8-1](docs/figures/samples/sample_8_1.png) |
+| ![Sample forecast 9-1](docs/figures/samples/sample_9_1.png) | ![Sample forecast 40-1](docs/figures/samples/sample_40_1.png) |
 
 
 ### Data Preparation and Feature Engineering
@@ -92,7 +107,44 @@ Analyzing Model V5 revealed it was slightly over-regularized—training and vali
 - **Adjustments**: Set `dropout = 0` (no regularization) and reduced `batch_size` for more precise updates.
 - **Outcome**: This unlocked the model's full power, boosting the R² to a state-of-the-art **0.9008**.
 
-These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For more details, check the code in `src/` or run the notebooks!
+These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For implementation details, see `src/train/` (Phase 1–3 scripts) and `src/evaluate.py` for test-set metrics aligned with [`configs/default.yaml`](configs/default.yaml).
+
+## Repository layout & quickstart
+
+```
+data/processed/         # scaler + splits (CSV/ZIPs are gitignored - see data/README.md)
+configs/default.yaml    # paths, checkpoints, hyperparameters
+docs/figures/           # legacy plots + regenerated diagnostic curves from evaluate.py
+outputs/checkpoints/    # saved .pth files (ignored by git unless you intentionally track them)
+src/
+  constants.py dataset.py losses.py model.py scaling.py utils.py evaluate.py phase2b_trainer.py
+  train/
+    phase1_teacher_forcing.py
+    phase2a_semi_autoregressive.py
+    phase2b_scheduled_sampling.py
+    phase3_autoregressive_finetune.py
+scripts/run_pipeline.sh # runs all phases + evaluation sequentially
+```
+
+1. `python -m venv .venv && source .venv/bin/activate`
+2. `pip install -r requirements.txt`
+3. Place the CSV splits under `data/processed/` (`train_selected_sites.csv`, `validation_enhanced.csv`, `test_enhanced.csv`) following [`data/README.md`](data/README.md).
+4. Run training + evaluation locally:
+
+```bash
+export PYTHONPATH="$(pwd)"
+python src/train/phase1_teacher_forcing.py
+python src/train/phase2a_semi_autoregressive.py
+python src/train/phase2b_scheduled_sampling.py
+python src/train/phase3_autoregressive_finetune.py
+python src/evaluate.py
+```
+
+or `./scripts/run_pipeline.sh`.
+
+Historical experiment branches (`Script`, `Dataset`, `Results`) are **deprecated**: their contents now live together on `main` as shown above.
+
+> **Reporting numbers:** README table values (V4–V6) came from notebooks used during experimentation. Numbers from `evaluate.py` are the canonical reproducible signal once you regenerate checkpoints locally.
 
 
 ## Model Architecture & Features
@@ -121,10 +173,10 @@ The model uses a rich set of engineered features to capture temporal and weather
 
 ## License
 
-This project is licensed under theGNU General Public License v3.0. See the `LICENSE` file for details.
+This project is licensed under the GNU General Public License v3.0. See [`LICENSE`](LICENSE) for details.
 
 ## Acknowledgments
 
 This project was made possible by the public availability of the dataset from the **[UNISOLAR]** by **[Harsha Kumara and Dilantha Haputhanthri]**. A special thanks to them for their contribution to the open-source community.
 
-* The original dataset can be found at: (https://github.com/original_author/original_repo_name](https://github.com/CDAC-lab/UNISOLAR))
+* The original dataset can be found at: [UNISOLAR on GitHub](https://github.com/CDAC-lab/UNISOLAR)

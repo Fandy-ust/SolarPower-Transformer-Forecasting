@@ -1,0 +1,81 @@
+# Solar transformer pipeline defaults (paths relative to repository root unless absolute)
+
+paths:
+  train_csv: data/processed/train_selected_sites.csv
+  validation_csv: data/processed/validation_enhanced.csv
+  test_csv: data/processed/test_enhanced.csv
+  campus_scale: data/processed/campus_scale.txt
+  checkpoints_dir: outputs/checkpoints
+  figures_dir: docs/figures
+
+checkpoints:
+  phase1_filename: transformer_elite_model_phase1_V3.pth
+  phase2a_filename: transformer_elite_model_phase2a.pth
+  phase2b_filename: transformer_elite_model_phase2b.pth
+  phase3_filename: transformer_final_polished.pth
+
+features:
+  target_column: SolarGeneration
+  weather:
+    - AirTemperature
+    - Ghi_hourly
+    - CloudOpacity_hourly
+    - minutes_since_last_update
+    - RelativeHumidity
+  time:
+    - zenith_sin
+    - azimuth_sin
+    - day_sin
+    - year_sin
+
+training:
+  lookback_steps: 96       # 4 * 24 (15-minute steps)
+  lookforward_steps: 20   # 4 * 5 hours
+  batch_size: 32
+
+  # Unified sentinel for missing supervision targets across all phases (-999 avoids overlap with scaled values)
+  sentinel_value: -999.0
+
+  d_model: 128
+  nhead: 8
+  num_encoder_layers: 3
+  num_decoder_layers: 3
+  dim_feedforward: 512
+  dropout_phase12: 0.1
+
+phase1_teacher_forcing:
+  epochs: 100
+  learning_rate: 1.0e-4
+  max_grad_norm: 1.0
+  patience: 5
+  num_workers: 4
+
+phase2a_semi_autoregressive:
+  epochs: 5
+  learning_rate: 5.0e-7
+  max_grad_norm: 1.0
+  patience: 3
+  num_workers: 4
+
+phase2b_scheduled_sampling:
+  epochs: 10
+  learning_rate: 1.0e-7
+  max_grad_norm: 1.0
+  patience: 15
+  num_workers: 0
+
+phase3_fully_autoregressive:
+  epochs: 5
+  learning_rate: 1.0e-6
+  grad_clip: 0.5
+  dropout: 0.1
+  batch_size: 32   # README V6 mentions smaller batches; adjust here when reproducing experiments
+
+evaluation:
+  batch_size: 32
+  num_workers: 0
+  plots:
+    rmse_curve: docs/figures/rmse_vs_steps_repro.png
+    r2_curve: docs/figures/r2_vs_steps_repro.png
+
+seed: 42

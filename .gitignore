@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+
+outputs/*
+!outputs/checkpoints/
+!outputs/logs/
+outputs/checkpoints/*
+!outputs/checkpoints/.gitkeep
+outputs/logs/*
+!outputs/logs/.gitkeep
+*.pth
+*.pt
+
+# Large processed splits (provide via Dataset branch release or unzip; see data/README.md)
+data/processed/*.csv
+data/processed/*.zip
