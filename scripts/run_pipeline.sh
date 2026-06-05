@@ -6,11 +6,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 export PYTHONPATH="${ROOT}:${PYTHONPATH:-}"
+export PYTHONPATH="${ROOT}/src:${PYTHONPATH}"
 
 PY=${PYTHON:-python3}
 
-"${PY}" src/train/phase1_teacher_forcing.py
-"${PY}" src/train/phase2a_semi_autoregressive.py
-"${PY}" src/train/phase2b_scheduled_sampling.py
-"${PY}" src/train/phase3_autoregressive_finetune.py
-"${PY}" src/evaluate.py
+"${PY}" -m solar_forecasting.training.phase1
+"${PY}" -m solar_forecasting.training.phase2a
+"${PY}" -m solar_forecasting.training.phase2b
+"${PY}" -m solar_forecasting.training.phase3
+"${PY}" -m solar_forecasting.evaluation

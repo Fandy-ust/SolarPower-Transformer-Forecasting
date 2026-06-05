@@ -4,12 +4,14 @@ This repository contains the code and documentation for a state-of-the-art deep 
 
 The model achieves an exceptional **R-squared (R²) score of 0.9008** on the final test set, demonstrating its high accuracy and reliability.
 
-This project is not just a demonstration of a powerful architecture, but a case study in advanced model development, including multi-phase training, mitigating exposure bias, and aggressive, intuition-driven fine-tuning.
+This project is not just a demonstration of a powerful architecture, but a case study in practical ML engineering: making intuitive assumptions about messy solar data, testing whether those assumptions improve the model, and then hardening the training process against real forecasting behavior.
 
 ## Key Features
 
 * **High-Resolution Forecasting:** Predicts solar generation for a 5-hour horizon at a 15-minute granularity.
 * **Transformer Architecture:** Leverages the power of self-attention mechanisms to capture complex temporal dependencies.
+* **Physics-Aware Data Preparation:** Normalizes site outputs, treats nighttime generation as true zero, and preserves uncertain daytime gaps as masked targets instead of forcing them into fake values.
+* **Practical Feature Engineering:** Uses solar position and feature-age signals (`minutes_since_last_update`) to handle mismatched data frequencies without noisy interpolation.
 * **Advanced Training Strategy:** Employs teacher forcing, staged semi-autoreg refinement, scheduled sampling, and finally a fully autoregressive polish.
 * **Exposure Bias Mitigation:** The final training phase is fully autoregressive, forcing the model to learn from its own predictions and making it resilient to compounding errors.
 * **State-of-the-Art Performance:** Achieves a final R² of **0.9008** and an RMSE of **1.6210 kW**.
@@ -57,7 +59,9 @@ In this project, I worked with a solar power dataset to make it suitable for tra
 
 #### Data Polishing
 
-The dataset comes from **[UNISOLAR]** by **[Harsha Kumara and Dilantha Haputhanthri]**. It includes solar power generation data from 5 cities, with multiple sites per city. Each site has varying panel areas, leading to a wide range of power outputs (in kW). Training a model on this raw data would be tricky—it might struggle to learn consistent patterns across sites, and generalizing to new stations could be hard. Plus, some site details were missing.
+The dataset comes from the **[UNISOLAR](https://github.com/CDAC-lab/UNISOLAR)** project by CDAC Lab at La Trobe University. UNISOLAR provides photovoltaic solar generation, weather, irradiance, and site metadata across La Trobe's five campuses, with solar generation recorded at 15-minute granularity and irradiance at hourly intervals. The original dataset is distributed through [Kaggle](https://www.kaggle.com/datasets/cdaclab/unisolar), and the project asks users to cite the UNISOLAR paper when using the data.
+
+This project uses processed UNISOLAR-derived splits for forecasting. Each site has varying panel areas, leading to a wide range of power outputs (in kW). Training a model on this raw data would be tricky: it might struggle to learn consistent patterns across sites, and generalizing to new stations could be hard.
 
 To simplify and standardize:
 - **Power normalization**: I linearly scaled all power data to a uniform range of 0-20 kW. This assumes:
@@ -83,6 +87,17 @@ The dataset has mismatched recording frequencies: power and weather data every 1
 - **Solar position features**: Calculated "zenith" and "azimuth" (sun's angular positions) and encoded them sinusoidally as inputs for both encoder and decoder. This guides the model in estimating future irradiance and weather, adding a natural "time-of-day" awareness.
 
 These features enhanced the model's ability to predict accurately over 6-hour horizons, contributing to the high R² score.
+
+#### Practical Assumptions
+
+Several preprocessing choices were intentionally simple and intuition-driven:
+
+- **Comparable site scale:** Solar generation was normalized because raw PV output strongly depends on site capacity. This assumes that, after scaling, different sites can share useful generation patterns even if they have different absolute sizes.
+- **Representative campus sites:** Because weather and irradiance are campus-level features, using many sites from the same campus can give the model identical inputs with different targets. Selecting one representative site per campus reduces that ambiguity.
+- **Different meanings of missing data:** Nighttime missing generation is treated as zero because solar panels should not generate power without sunlight. Daytime gaps are kept as missing targets and masked during loss calculation because they may represent sensor or reporting failure, not true zero production.
+- **No forced interpolation for hourly features:** Hourly irradiance/cloud features are not smoothed into artificial 15-minute values. Instead, `minutes_since_last_update` lets the model learn how stale those inputs are.
+
+These assumptions are not perfect physical laws; they are practical modeling choices that make the forecasting problem cleaner while preserving the most important solar behavior.
 
 
 
@@ -117,7 +132,23 @@ Analyzing Model V5 revealed it was slightly over-regularized—training and vali
 - **Adjustments**: Set `dropout = 0` (no regularization) and reduced `batch_size` for more precise updates.
 - **Outcome**: This unlocked the model's full power, boosting the R² to a state-of-the-art **0.9008**.
 
-These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For implementation details, see `src/train/` (Phase 1–3 scripts) and `src/evaluate.py` for test-set metrics aligned with [`configs/default.yaml`](configs/default.yaml).
+These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For implementation details, see `src/solar_forecasting/training/` (Phase 1–3 implementation modules) and `src/solar_forecasting/evaluation.py` for test-set metrics aligned with [`configs/default.yaml`](configs/default.yaml).
+
+## Design Overview
+
+The pipeline is organized around a small number of clear stages:
+
+1. Load processed UNISOLAR-derived solar, weather, and time-feature CSV splits from `data/processed/`.
+2. Apply per-campus z-score scaling using `data/processed/campus_scale.txt`.
+3. Build sliding windows for each campus:
+   - encoder input: 96 historical 15-minute steps
+   - decoder input: 20 future 15-minute steps
+4. Train the Transformer through increasingly realistic forecasting phases:
+   - Phase 1: teacher forcing
+   - Phase 2A: semi-autoregressive gap filling
+   - Phase 2B: scheduled sampling
+   - Phase 3: fully autoregressive fine-tuning
+5. Evaluate the final checkpoint on `test_enhanced.csv` and regenerate diagnostic plots.
 
 ## Repository layout & quickstart
 
@@ -126,35 +157,64 @@ data/processed/         # scaler + splits (CSV/ZIPs are gitignored - see data/RE
 configs/default.yaml    # paths, checkpoints, hyperparameters
 docs/figures/           # legacy plots + regenerated diagnostic curves from evaluate.py
 outputs/checkpoints/    # saved .pth files (ignored by git unless you intentionally track them)
+pyproject.toml          # package metadata for editable installs and tooling
 src/
-  constants.py dataset.py losses.py model.py scaling.py utils.py evaluate.py phase2b_trainer.py
+  solar_forecasting/    # importable package with model, data, training, and evaluation logic
+    constants.py
+    dataset.py
+    losses.py
+    model.py
+    scaling.py
+    utils.py
+    evaluation.py
+    training/
+      phase1.py
+      phase2a.py
+      phase2b.py
+      phase2b_trainer.py
+      phase3.py
+  evaluate.py           # compatibility wrapper
   train/
-    phase1_teacher_forcing.py
+    phase1_teacher_forcing.py          # compatibility wrappers
     phase2a_semi_autoregressive.py
     phase2b_scheduled_sampling.py
     phase3_autoregressive_finetune.py
 scripts/run_pipeline.sh # runs all phases + evaluation sequentially
+tests/                  # lightweight smoke tests
 ```
 
 1. `python -m venv .venv && source .venv/bin/activate`
 2. `pip install -r requirements.txt`
-3. Place the CSV splits under `data/processed/` (`train_selected_sites.csv`, `validation_enhanced.csv`, `test_enhanced.csv`) following [`data/README.md`](data/README.md).
-4. Run training + evaluation locally:
+3. `pip install -e .`
+4. Place the CSV splits under `data/processed/` (`train_selected_sites.csv`, `validation_enhanced.csv`, `test_enhanced.csv`) following [`data/README.md`](data/README.md).
+5. Run training + evaluation locally:
 
 ```bash
-export PYTHONPATH="$(pwd)"
-python src/train/phase1_teacher_forcing.py
-python src/train/phase2a_semi_autoregressive.py
-python src/train/phase2b_scheduled_sampling.py
-python src/train/phase3_autoregressive_finetune.py
-python src/evaluate.py
+python -m solar_forecasting.training.phase1
+python -m solar_forecasting.training.phase2a
+python -m solar_forecasting.training.phase2b
+python -m solar_forecasting.training.phase3
+python -m solar_forecasting.evaluation
 ```
 
-or `./scripts/run_pipeline.sh`.
+or `./scripts/run_pipeline.sh`. The old paths under `src/train/` and `src/evaluate.py` are kept as compatibility wrappers.
 
 Historical experiment branches (`Script`, `Dataset`, `Results`) are **deprecated**: their contents now live together on `main` as shown above.
 
 > **Reporting numbers:** README table values (V4–V6) came from notebooks used during experimentation. Numbers from `evaluate.py` are the canonical reproducible signal once you regenerate checkpoints locally.
+
+## Testing
+
+This project includes a lightweight model smoke test in [`tests/test_model.py`](tests/test_model.py). It creates a small Transformer, passes fake encoder/decoder tensors through it, and verifies that the output shape is `[batch_size, forecast_steps, 1]`.
+
+Run it after installing the project with development dependencies:
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+This test does not validate forecasting accuracy; it is a fast structural check that the model accepts the expected tensor shapes and produces one prediction per forecast step.
 
 
 ## Model Architecture & Features
@@ -187,6 +247,8 @@ This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for det
 
 ## Acknowledgments
 
-This project was made possible by the public availability of the dataset from the **[UNISOLAR]** by **[Harsha Kumara and Dilantha Haputhanthri]**. A special thanks to them for their contribution to the open-source community.
+This project was made possible by the public availability of the **[UNISOLAR](https://github.com/CDAC-lab/UNISOLAR)** dataset from CDAC Lab at La Trobe University. A special thanks to the UNISOLAR authors for releasing a public benchmark for solar energy forecasting research.
 
 * The original dataset can be found at: [UNISOLAR on GitHub](https://github.com/CDAC-lab/UNISOLAR)
+* Dataset location: [UNISOLAR on Kaggle](https://www.kaggle.com/datasets/cdaclab/unisolar)
+* Citation: S. Wimalaratne, D. Haputhanthri, S. Kahawala, G. Gamage, D. Alahakoon and A. Jennings, "UNISOLAR: An Open Dataset of Photovoltaic Solar Energy Generation in a Large Multi-Campus University Setting," 2022 15th International Conference on Human System Interaction (HSI), 2022, pp. 1-5, doi: [10.1109/HSI55341.2022.9869474](https://ieeexplore.ieee.org/document/9869474).
