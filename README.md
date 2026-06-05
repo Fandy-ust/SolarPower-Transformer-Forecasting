@@ -183,7 +183,7 @@ The model uses a rich set of engineered features to capture temporal and weather
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. See [`LICENSE`](LICENSE) for details.
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 ## Acknowledgments
 
