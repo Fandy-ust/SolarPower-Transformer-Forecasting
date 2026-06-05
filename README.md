@@ -28,17 +28,27 @@ The project's success is best illustrated by the iterative improvement across th
 
 The plots below show how the final model behaves across the 20-step forecast horizon. The horizon covers 5 hours at 15-minute resolution, so later steps are harder because the model must keep using its own previous predictions.
 
-| R² across forecast horizon | RMSE across forecast horizon |
-| :---: | :---: |
-| ![R² vs forecast steps](docs/figures/r2_vs_steps.png) | ![RMSE vs forecast steps](docs/figures/rmse_vs_steps.png) |
+### Horizon Metrics
+
+![R² across forecast horizon](./docs/figures/r2_vs_steps.png)
+
+![RMSE across forecast horizon](./docs/figures/rmse_vs_steps.png)
 
 The sample traces compare predicted solar generation against the observed curve. These examples are useful because solar forecasting is not only about hitting aggregate metrics: the model also needs to capture the daily generation shape, ramp-up, peak, and ramp-down behavior.
 
-| Sample prediction | Sample prediction |
-| :---: | :---: |
-| ![Sample forecast 2-1](docs/figures/samples/sample_2_1.png) | ![Sample forecast 4-2](docs/figures/samples/sample_4_2.png) |
-| ![Sample forecast 6-1](docs/figures/samples/sample_6_1.png) | ![Sample forecast 8-1](docs/figures/samples/sample_8_1.png) |
-| ![Sample forecast 9-1](docs/figures/samples/sample_9_1.png) | ![Sample forecast 40-1](docs/figures/samples/sample_40_1.png) |
+### Prediction Examples
+
+![Sample forecast 2-1](./docs/figures/samples/sample_2_1.png)
+
+![Sample forecast 4-2](./docs/figures/samples/sample_4_2.png)
+
+![Sample forecast 6-1](./docs/figures/samples/sample_6_1.png)
+
+![Sample forecast 8-1](./docs/figures/samples/sample_8_1.png)
+
+![Sample forecast 9-1](./docs/figures/samples/sample_9_1.png)
+
+![Sample forecast 40-1](./docs/figures/samples/sample_40_1.png)
 
 
 ### Data Preparation and Feature Engineering
