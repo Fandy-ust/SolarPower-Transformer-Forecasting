@@ -22,52 +22,78 @@ The project's success is best illustrated by the iterative improvement across th
 | :------------ | :----------------------------------- | :---------- | :----------------- |
 | **V4**        | Elite Baseline (Pre-Polish)          | 0.8731      | \~1.95             |
 | **V5**        | Standard Autoregressive Polish       | 0.8779      | 1.798              |
-| **V6 ()**     | **Aggressive Autoregressive Polish** | **0.9002**  | **1.624**          |
-
-## The Journey: A Multi-Phase Approach
-
-The core philosophy of this project was to systematically build upon a strong foundation, identify hidden weaknesses, and forge a final model that is not just academically accurate but industrially robust.
-
-### Datapolishing
-
-The dataset being polished is from the **[UNISOLAR]** by **[Harsha Kumara and Dilantha Haputhanthri]** The original dataset consists solar power generation data from 5 different cities. Within each city, there are various sites of solar panel with different total panel area. Therefore the range of power(kW), which is strongly related to total panel area, various significantly between different sites and cities. It would be complicated to maintain a model that learn to generate different output as there are 42 different solar panel stations with different total panel area. It is also hard to generatize the model to other power stations. More importantly, some of the site information provided from **[UNISOLAR]** is missing. We dicided to linearly scale all the power data of different stations into a selected range of 0-20kW. 2 assumptions were made: 
-* light intensity is uniform at the solar panel. 
-* Panel efficiency is independent to size of power station.
-
-Solar power generation should be directly proportional to the total panel area. We carefully chose a standard total panel area with range of power generation 0-20kW. It is observed that power stations with similar total panel area have similar range of power generation, as the power data span through several years, every station have been through similar peak light intensity. Therefore we could directly scale the power data from it's original range to standard range as input for model. an intuitive way is to think it as switching from power to power per m^2. 
-
-The weather data and solar irradiance provided are citywised instead of stationwised. We tried to include every stations in a city as training samples, but found model confusing the input-output relationship. At any instant, the model recieve identical input (airtemperature, solar irradiance .etc) from stations in same city, is required to generate different output (power). We decided to select one station per city to avoid such confusion. For stations in a city, we trained a simple LSTM model to predict future power generation and evaluated their performance on stations of other cities. The one with most reasonable R^2 and RMSE was chosen. 5 stations from 5 cities were selected as training samples. The validation set and test set was randomly extracted and removed from the 5 stations.  
-
-The provided dataset consists empty strings as power generation. Some unrecorded power generation due to the absence of sunlight during night were filled with 0. The other "empty" power generation at noon, appearing as loss of data, were remained unfilled. There "NaN" values to computer are marked and masked during training.
-
-### Feature Engineering
-
-The power generation data and weather data were recorded every 15 minutes. However, the cloud opacity and solar irradiance data were recoded hourly. To bridge the gap between input features and maintain the highest input resolution, we decided to add a periodic feature "minutes_since_last_update" to inform the model how certain is the irradiance data and opacity.
-This enable the model to deduce the effective information from input on its own, instead of interpolation, which could lead to noise fitting.
-
-We created calculated features like "zenith" and "azimuth" as encoder and decoder input to provide Sun's angular position in a sinusoidal way. This could warmly guide the model to estimate future solar irradiance and even weather conditions.
+| **V6**        | **Aggressive Autoregressive Polish** | **0.9002**  | **1.624**          |
 
 
 
+### Data Preparation and Feature Engineering
+
+In this project, I worked with a solar power dataset to make it suitable for training a high-performing Transformer model. Below, I'll explain the key steps in polishing the data and engineering features. These processes ensured the model could generalize well, handle inconsistencies, and capture important patterns like solar position and weather variability.
+
+#### Data Polishing
+
+The dataset comes from **[UNISOLAR]** by **[Harsha Kumara and Dilantha Haputhanthri]**. It includes solar power generation data from 5 cities, with multiple sites per city. Each site has varying panel areas, leading to a wide range of power outputs (in kW). Training a model on this raw data would be tricky—it might struggle to learn consistent patterns across sites, and generalizing to new stations could be hard. Plus, some site details were missing.
+
+To simplify and standardize:
+- **Power normalization**: I linearly scaled all power data to a uniform range of 0-20 kW. This assumes:
+  - Light intensity is uniform across panels.
+  - Panel efficiency doesn't depend on the station's size.
+- **Why this works**: Solar power is proportional to panel area. By scaling to a "standard" range (based on observed peaks over years), it's like converting to power per square meter—making outputs comparable across sites.
+
+Next, weather and irradiance data are city-wide (not per station). Feeding all stations from one city confused the model, as it got identical inputs but expected different outputs. Solution:
+- **Site selection**: I picked one representative station per city (5 total). To choose, I trained a simple LSTM model on each and evaluated cross-city performance (R² and RMSE). The best performer per city was selected.
+- **Splitting the data**: Validation and test sets were randomly sampled from these 5 stations.
+
+Handling missing values:
+- Empty strings in power data during nighttime (no sunlight) were filled with 0.
+- Other gaps (e.g., midday data loss) were left as NaN and masked during training, so the model learns to handle them.
+
+This polishing created a clean, consistent dataset ready for modeling.
+
+#### Feature Engineering
+
+The dataset has mismatched recording frequencies: power and weather data every 15 minutes, but cloud opacity and solar irradiance hourly. Instead of interpolating (which could add noise), I engineered smart features to let the model infer patterns itself.
+
+- **Bridging time gaps**: Added a periodic feature called "minutes_since_last_update" to indicate how fresh the hourly data is. This helps the model weigh the reliability of inputs without forced interpolation.
+- **Solar position features**: Calculated "zenith" and "azimuth" (sun's angular positions) and encoded them sinusoidally as inputs for both encoder and decoder. This guides the model in estimating future irradiance and weather, adding a natural "time-of-day" awareness.
+
+These features enhanced the model's ability to predict accurately over 6-hour horizons, contributing to the high R² score.
 
 
-### Phase 1 & 2: The Strong Baseline (Model V4)
 
-The initial phases focused on building a powerful Transformer model using standard best practices, including teacher forcing and scheduled sampling. This produced a model with a very high R² score of **0.873**, but it suffered from a critical theoretical flaw: **exposure bias**. It had never been trained to handle its own errors, which could lead to forecast degradation in a live environment.
+### Building the Model: From Baseline to State-of-the-Art
 
-### Phase 3: The Autoregressive Polish (Model V5)
+In this project, I developed a Transformer-based model for solar power forecasting. Below, I'll walk you through the key phases of development, highlighting the challenges, innovations, and improvements along the way. Each phase built on the last, tackling issues like exposure bias and over-regularization to achieve a final R² score of **0.9002**.
 
-This phase was designed specifically to eliminate exposure bias. The model was fine-tuned in a **fully autoregressive** manner, meaning it was forced to use its own previous prediction as input for the next step. This is analogous to removing the training wheels.
+#### Phase 1 & 2: Establishing a Strong Baseline (Model V4)
 
-> This process hardened the model, teaching it to self-correct and maintain stability over a long forecast horizon, resulting in an improved R² of **0.878**.
+The early stages focused on creating a robust Transformer model using proven techniques like **teacher forcing** (feeding the model the correct answers during training) and **scheduled sampling** (gradually introducing the model's own predictions).
 
-### The  Push: Calibrated Aggression (Model V6)
+Here's how it worked:
+- **Handling missing values**: For sequences with gaps (e.g., [t0, t1, NaN, NaN, t4, t5]), the model autoregressively fills them in. It predicts `t2` using t0 and t1 as input, then uses that prediction to forecast `t3`, and so on.
+- **Filling and refining**: Once gaps are filled (e.g., [t0, t1, predicted_t2, predicted_t3, t4, t5]), the model switches to teacher forcing mode, generating outputs based partly on its own predictions.
+- **Iterative improvement**: In the next epoch, missing values in the dataset are replaced with predictions from the previous round. We also randomly sample some real values with probability ε to simulate real-world noise.
 
-Upon analyzing the V5 model, I diagnosed that it was slightly over-regularized—the training and validation performance were too close, suggesting it had more learning capacity. This led to a final, bold experiment based on a clear hypothesis:
+This approach yielded a solid R² score of **0.873**. However, it had a key limitation: **exposure bias**—the model wasn't fully trained to handle its own errors, which could cause performance drops in real-time forecasting.
 
-> "I can accept an increasing gap between train and validation loss, as long as the validation performance itself improves. The model has untapped potential."
+#### Phase 3: Eliminating Exposure Bias with Autoregressive Fine-Tuning (Model V5)
 
-By setting `dropout = 0` and reducing the `batch_size` for finer-grained updates, I allowed the model to use its full capacity. This final, aggressive polish unlocked its true potential, resulting in the final state-of-the-art R² score of **0.9002**.
+To address exposure bias, I fine-tuned the model in a **fully autoregressive** setup—like removing the training wheels. Now, the model relied entirely on its own previous predictions as input for the next steps.
+
+- **Why this matters**: This "hardening" process taught the model to self-correct and stay stable over long forecast horizons (e.g., predicting 6 hours ahead).
+- **Results**: The R² improved to **0.878**, showing better resilience to accumulated errors.
+
+#### The Final Push: Unleashing Full Potential (Model V6)
+
+Analyzing Model V5 revealed it was slightly over-regularized—training and validation performance were too similar, indicating untapped capacity. I tested a bold hypothesis:
+
+> "We can tolerate a growing gap between training and validation loss if validation performance keeps improving—the model has more to learn."
+
+- **Adjustments**: Set `dropout = 0` (no regularization) and reduced `batch_size` for more precise updates.
+- **Outcome**: This unlocked the model's full power, boosting the R² to a state-of-the-art **0.9002**.
+
+These phases transformed a baseline model into a high-performing forecaster, even without future weather data. For more details, check the code in `src/` or run the notebooks!
+
 
 ## Model Architecture & Features
 
